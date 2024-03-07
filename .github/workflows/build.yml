@@ -51,11 +51,11 @@ jobs:
         uses: actions/checkout@v4
       - name: run release build
         run: '. $HOME/.cargo/env && cargo build --all-targets --release'
-      - name: run debug tests
+      - name: run release tests
         run: '. $HOME/.cargo/env && cargo test --release'
       - name: upload release binary
         uses: actions/upload-artifact@v4
         with:
-          name: prometheus-radiator-exporter-debug-ubuntu-jammy
+          name: prometheus-radiator-exporter-release-ubuntu-jammy
           path: |
             target/release/prometheus-radiator-exporter
