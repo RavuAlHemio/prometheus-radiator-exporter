@@ -3,8 +3,10 @@ mod radiator;
 
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::ffi::OsString;
+use std::fmt::{self, Write};
 use std::net::SocketAddr;
 use std::path::Path;
 use std::process::ExitCode;
@@ -18,10 +20,25 @@ use hyper_util::server::conn::auto::Builder;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use toml;
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::config::{CONFIG, Config};
 use crate::radiator::{connect_to_radiator, RADIATOR_SOCKET};
+
+
+#[derive(Clone, Copy)]
+enum Number {
+    Integer(i64),
+    Float(f64),
+}
+impl fmt::Display for Number {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Integer(v) => write!(f, "{}", v),
+            Self::Float(v) => write!(f, "{}", v),
+        }
+    }
+}
 
 
 fn return_500() -> Result<Response<Full<Bytes>>, Infallible> {
@@ -32,6 +49,20 @@ fn return_500() -> Result<Response<Full<Bytes>>, Infallible> {
             .body(Full::new(Bytes::from("internal server error")))
             .expect("cannot construct HTTP 500 response")
     )
+}
+
+
+fn escape_openmetrics_into(source: &str, destination: &mut String) {
+    for c in source.chars() {
+        if c == '\\' || c == '"' {
+            destination.push('\\');
+            destination.push(c);
+        } else if c == '\n' {
+            destination.push_str("\\n");
+        } else {
+            destination.push(c);
+        }
+    }
 }
 
 
@@ -60,11 +91,113 @@ async fn handle_request(request: Request<Incoming>) -> Result<Response<Full<Byte
         },
     };
 
-    // FIXME: reformat this into OpenMetrics
+    // response format: b"STATS .\nkey1:value1\x01key2:value2\x01key3:value3"
+
+    // skip echoed command
+    let newline_index = match radiator_response.iter().position(|b| *b == b'\n') {
+        Some(i) => i,
+        None => {
+            error!("Radiator response {:?} does not contain a newline (splitting echoed command and actual response)", radiator_response);
+            return return_500();
+        },
+    };
+    let unechoed_response = &radiator_response[newline_index+1..];
+
+    // decode as UTF-8
+    let response_string = match std::str::from_utf8(unechoed_response) {
+        Ok(rs) => rs,
+        Err(e) => {
+            error!("Radiator response {:?} is not valid UTF-8: {}", radiator_response, e);
+            return return_500();
+        },
+    };
+
+    // key-value pairs are delimited by U+0001 characters
+    let mut statistics = HashMap::new();
+    let key_value_pairs = response_string.split('\u{0001}');
+    for key_value_pair in key_value_pairs {
+        // keys and values are delimited by a colon (let's assume the first one)
+        let (key, value) = match key_value_pair.split_once(':') {
+            Some(kv) => kv,
+            None => {
+                warn!("statistics key-value pair {:?} does not contain colon; skipping", key_value_pair);
+                continue;
+            },
+        };
+
+        // parse value
+        let value = match value.parse() {
+            Ok(v) => Number::Integer(v),
+            Err(_) => {
+                // integer failed; try float
+                match value.parse() {
+                    Ok(v) => Number::Float(v),
+                    Err(e) => {
+                        warn!("failed to parse value {:?} for statistic {:?} as an integer or floating-point value (skipping it): {}", value, key, e);
+                        continue;
+                    },
+                }
+            },
+        };
+
+        if let Some(old_value) = statistics.insert(key.to_owned(), value) {
+            warn!("duplicate statistic {:?}; overwriting old value {} with {}", key, old_value, value);
+        }
+    }
+
+    // prepare OpenMetrics output
+    let mut output = String::new();
+    let config = CONFIG
+        .get().expect("CONFIG not set?!");
+    for metric in &config.metrics {
+        let mut first_sample = true;
+
+        for sample in &metric.samples {
+            // do we even have a value for this one?
+            let Some(value) = statistics.get(&sample.statistic) else { continue };
+
+            if first_sample {
+                write!(output, "# TYPE {} {}\n", metric.metric, metric.kind.as_openmetrics()).unwrap();
+
+                if let Some(unit) = metric.unit.as_ref() {
+                    write!(output, "# UNIT {} {}\n", metric.metric, unit).unwrap();
+                }
+
+                if let Some(help) = metric.help.as_ref() {
+                    write!(output, "# HELP {} ", metric.metric).unwrap();
+                    escape_openmetrics_into(help, &mut output);
+                    output.push('\n');
+                }
+
+                first_sample = false;
+            }
+
+            write!(output, "{}{} ", metric.metric, metric.kind.openmetrics_metric_suffix()).unwrap();
+            if sample.labels.len() > 0 {
+                output.push('{');
+                let mut first_label = true;
+                for (label_key, label_value) in &sample.labels {
+                    if first_label {
+                        first_label = false;
+                    } else {
+                        output.push(',');
+                    }
+                    write!(output, "{}=\"", label_key).unwrap();
+                    escape_openmetrics_into(label_value, &mut output);
+                    output.push('"');
+                }
+                output.push_str("} ");
+            }
+
+            write!(output, "{}\n", value).unwrap();
+        }
+    }
+    output.push_str("# EOF\n");
+
     let response_res = Response::builder()
         .status(200)
-        .header("Content-Type", "application/octet-stream")
-        .body(Full::new(Bytes::from(radiator_response)));
+        .header("Content-Type", "application/openmetrics-text; version=1.0.0; charset=utf-8")
+        .body(Full::new(Bytes::from(output)));
     match response_res {
         Ok(r) => Ok(r),
         Err(e) => {

@@ -2,14 +2,14 @@ use std::fmt;
 use std::io;
 use std::sync::OnceLock;
 
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufStream};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
 use crate::config::{CONFIG, RadiatorConfig};
 
 
-pub(crate) static RADIATOR_SOCKET: OnceLock<Mutex<BufStream<TcpStream>>> = OnceLock::new();
+pub(crate) static RADIATOR_SOCKET: OnceLock<Mutex<BufReader<TcpStream>>> = OnceLock::new();
 
 
 #[derive(Debug)]
@@ -43,10 +43,10 @@ impl From<io::Error> for Error {
 }
 
 
-pub(crate) async fn connect_to_radiator(config: &RadiatorConfig) -> Result<BufStream<TcpStream>, Error> {
+pub(crate) async fn connect_to_radiator(config: &RadiatorConfig) -> Result<BufReader<TcpStream>, Error> {
     // connect
     let connection = TcpStream::connect((config.target, config.mgmt_port)).await?;
-    let mut buffered_connection = BufStream::new(connection);
+    let mut buffered_connection = BufReader::new(connection);
 
     // switch to binary mode and log in
     let login_string = format!("BINARY\r\nLOGIN {} {}\0", config.username, config.password);
@@ -66,7 +66,7 @@ pub(crate) async fn connect_to_radiator(config: &RadiatorConfig) -> Result<BufSt
     }
 }
 
-async fn write_command(connection: &mut BufStream<TcpStream>, command: &[u8]) -> Result<(), Error> {
+async fn write_command(connection: &mut BufReader<TcpStream>, command: &[u8]) -> Result<(), Error> {
     // no NUL byte in command
     assert!(command.iter().all(|b| *b != 0x00), "no NUL byte in command");
 

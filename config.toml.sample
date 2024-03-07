@@ -1,0 +1,91 @@
+[www]
+bind_address = "0.0.0.0"
+port = 10014
+
+[radiator]
+target = "127.0.0.1"
+mgmt_port = 9000
+username = "prom"
+password = "Tr0ub4dor&3"
+
+[[metrics]]
+metric = "radiator_requests"
+kind = "counter"
+help = "Number of requests received, categorized by request type."
+[[metrics.samples]]
+labels = { request_type = "access" }
+statistic = "Access requests"
+[[metrics.samples]]
+labels = { request_type = "accounting" }
+statistic = "Accounting requests"
+
+[[metrics]]
+metric = "radiator_responses"
+kind = "counter"
+help = "Number of responses to requests sent, categorized by response type."
+[[metrics.samples]]
+labels = { "type" = "access_accept" }
+statistic = "Access accepts"
+[[metrics.samples]]
+labels = { "type" = "access_challenge" }
+statistic = "Access challenges"
+[[metrics.samples]]
+labels = { "type" = "access_reject" }
+statistic = "Access rejects"
+[[metrics.samples]]
+labels = { "type" = "accounting" }
+statistic = "Accounting responses"
+
+[[metrics]]
+metric = "radiator_request_errors"
+kind = "counter"
+help = "Number of request errors, categorized by request and error type."
+[[metrics.samples]]
+labels = { request_type = "access", error_type = "bad_authenticator" }
+statistic = "Bad authenticators in authentication requests"
+[[metrics.samples]]
+labels = { request_type = "access", error_type = "dropped" }
+statistic = "Dropped access requests"
+[[metrics.samples]]
+labels = { request_type = "access", error_type = "duplicate" }
+statistic = "Duplicate access requests"
+[[metrics.samples]]
+labels = { request_type = "access", error_type = "malformed" }
+statistic = "Malformed access requests"
+[[metrics.samples]]
+labels = { request_type = "accounting", error_type = "bad_authenticator" }
+statistic = "Bad authenticators in accounting requests"
+[[metrics.samples]]
+labels = { request_type = "accounting", error_type = "dropped" }
+statistic = "Dropped accounting requests"
+[[metrics.samples]]
+labels = { request_type = "accounting", error_type = "duplicate" }
+statistic = "Duplicate accounting requests"
+[[metrics.samples]]
+labels = { request_type = "accounting", error_type = "malformed" }
+statistic = "Malformed accounting requests"
+
+[[metrics]]
+metric = "radiator_proxied_requests"
+kind = "counter"
+help = "Number of requests proxied to a remote RADIUS server."
+[[metrics.samples]]
+labels = {}
+statistic = "Total proxied requests"
+
+[[metrics]]
+metric = "radiator_proxied_requests_with_no_reply"
+kind = "counter"
+help = "Number of proxied requests that did not receive a reply from the remote RADIUS server."
+[[metrics.samples]]
+labels = {}
+statistic = "Total proxied requests with no reply"
+
+[[metrics]]
+metric = "radiator_average_response_time_seconds"
+kind = "gauge"
+unit = "seconds"
+help = "Average response time over the past 100 requests."
+[[metrics.samples]]
+labels = {}
+statistic = "Average response time"

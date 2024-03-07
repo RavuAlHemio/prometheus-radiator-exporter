@@ -11,16 +11,4 @@ The exporter is configured in a TOML file. By default, `prometheus-radiator-expo
 file named `config.toml` in the current working directory; the path to an alternative configuration
 file can be passed on the command line.
 
-Sample configuration file:
-
-```
-[www]
-bind_address = "0.0.0.0"
-port = 10014
-
-[radiator]
-target = "127.0.0.1"
-mgmt_port = 9000
-username = "prom"
-password = "Tr0ub4dor&3"
-```
+The repository contains a sample configuration file named `config.toml.sample`.
