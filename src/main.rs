@@ -83,7 +83,13 @@ async fn main() -> ExitCode {
     if let Some(pn) = args.get(0) {
         prog_name = pn.to_string_lossy();
     }
-    if args.len() < 1 || args.len() > 2 || args[1].to_string_lossy().starts_with("-") {
+    let output_usage =
+        args.len() < 1
+        || args.len() > 2
+        || args.get(1)
+            .map(|s| s.to_string_lossy().starts_with("-"))
+            .unwrap_or(false);
+    if output_usage {
         eprintln!("Usage: {} [CONFIG.TOML]", prog_name);
         return ExitCode::FAILURE;
     }
