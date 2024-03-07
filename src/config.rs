@@ -24,7 +24,7 @@ pub(crate) struct WwwConfig {
 }
 impl WwwConfig {
     const fn default_bind_address() -> IpAddr { IpAddr::V6(Ipv6Addr::UNSPECIFIED) }
-    const fn default_port() -> u16 { 10013 }
+    const fn default_port() -> u16 { 10014 }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]

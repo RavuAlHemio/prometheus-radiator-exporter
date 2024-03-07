@@ -16,7 +16,7 @@ Sample configuration file:
 ```
 [www]
 bind_address = "0.0.0.0"
-port = 10013
+port = 10014
 
 [radiator]
 target = "127.0.0.1"
