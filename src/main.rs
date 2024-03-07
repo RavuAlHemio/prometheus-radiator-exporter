@@ -172,7 +172,7 @@ async fn handle_request(request: Request<Incoming>) -> Result<Response<Full<Byte
                 first_sample = false;
             }
 
-            write!(output, "{}{} ", metric.metric, metric.kind.openmetrics_metric_suffix()).unwrap();
+            write!(output, "{}{}", metric.metric, metric.kind.openmetrics_metric_suffix()).unwrap();
             if sample.labels.len() > 0 {
                 output.push('{');
                 let mut first_label = true;
@@ -186,10 +186,10 @@ async fn handle_request(request: Request<Incoming>) -> Result<Response<Full<Byte
                     escape_openmetrics_into(label_value, &mut output);
                     output.push('"');
                 }
-                output.push_str("} ");
+                output.push('}');
             }
 
-            write!(output, "{}\n", value).unwrap();
+            write!(output, " {}\n", value).unwrap();
         }
     }
     output.push_str("# EOF\n");
