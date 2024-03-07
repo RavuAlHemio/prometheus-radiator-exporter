@@ -1,0 +1,15 @@
+[package]
+name = "prometheus-radiator-exporter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+http-body-util = { version = "0.1" }
+hyper = { version = "1.2" }
+hyper-util = { version = "0.1", features = ["http1", "http2", "server", "tokio"] }
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.36", features = ["macros", "net", "rt", "rt-multi-thread"] }
+toml = { version = "0.8" }
+tracing = { version = "0.1" }
+tracing-appender = { version = "0.2" }
+tracing-subscriber = { version = "0.3" }
