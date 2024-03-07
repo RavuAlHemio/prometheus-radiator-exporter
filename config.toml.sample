@@ -24,16 +24,16 @@ metric = "radiator_responses"
 kind = "counter"
 help = "Number of responses to requests sent, categorized by response type."
 [[metrics.samples]]
-labels = { "type" = "access_accept" }
+labels = { response_type = "access_accept" }
 statistic = "Access accepts"
 [[metrics.samples]]
-labels = { "type" = "access_challenge" }
+labels = { response_type = "access_challenge" }
 statistic = "Access challenges"
 [[metrics.samples]]
-labels = { "type" = "access_reject" }
+labels = { response_type = "access_reject" }
 statistic = "Access rejects"
 [[metrics.samples]]
-labels = { "type" = "accounting" }
+labels = { response_type = "accounting" }
 statistic = "Accounting responses"
 
 [[metrics]]
