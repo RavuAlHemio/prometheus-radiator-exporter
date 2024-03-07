@@ -48,8 +48,8 @@ pub(crate) async fn connect_to_radiator(config: &RadiatorConfig) -> Result<BufSt
     let connection = TcpStream::connect((config.target, config.mgmt_port)).await?;
     let mut buffered_connection = BufStream::new(connection);
 
-    // login
-    let login_string = format!("LOGIN {} {}\0", config.username, config.password);
+    // switch to binary mode and log in
+    let login_string = format!("BINARY\r\nLOGIN {} {}\0", config.username, config.password);
     let login_bytes = login_string.as_bytes(); // UTF-8
     buffered_connection.write_all(&login_bytes).await?;
     buffered_connection.flush().await?;
