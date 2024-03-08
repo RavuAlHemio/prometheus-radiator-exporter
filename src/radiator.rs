@@ -101,6 +101,7 @@ pub(crate) async fn communicate(command: &[u8]) -> Result<Vec<u8>, Error> {
     let mut buf = Vec::new();
     loop {
         // try receiving a response
+        buf.clear();
         connection_guard.read_until(b'\0', &mut buf).await?;
         assert_eq!(buf.last(), Some(&b'\0'));
         buf.pop();
