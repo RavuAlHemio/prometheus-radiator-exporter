@@ -7,7 +7,7 @@ use tokio::net::TcpStream;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::config::{CONFIG, RadiatorConfig};
 
@@ -40,6 +40,13 @@ async fn message_processor(
                 error!("error reading from Radiator management socket: {}", e);
 
                 // break out, waiting for a new socket
+                break;
+            }
+            if buf.len() == 0 {
+                // EOF
+                warn!("end-of-file encountered while reading from Radiator management socket");
+
+                // again, wait for a new socket
                 break;
             }
             assert!(buf.last() == Some(&b'\0'));
