@@ -24,7 +24,7 @@ jobs:
       - name: run debug build
         run: '. $HOME/.cargo/env && cargo build --all-targets'
       - name: run debug tests
-        run: '. $HOME/.cargo/env && cargo test'
+        run: '. $HOME/.cargo/env && PROM_RAD_EXP_CICD=0 cargo test'
       - name: upload release binary
         uses: actions/upload-artifact@v4
         with:
@@ -54,7 +54,7 @@ jobs:
       - name: run release build
         run: '. $HOME/.cargo/env && cargo build --all-targets --release'
       - name: run release tests
-        run: '. $HOME/.cargo/env && cargo test --release'
+        run: '. $HOME/.cargo/env && PROM_RAD_EXP_CICD=0 cargo test --release'
       - name: upload release binary
         uses: actions/upload-artifact@v4
         with:
