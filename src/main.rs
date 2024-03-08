@@ -23,7 +23,7 @@ use toml;
 use tracing::{error, warn};
 
 use crate::config::{CONFIG, Config};
-use crate::radiator::{connect_to_radiator, RADIATOR_SOCKET};
+use crate::radiator::{connect_to_radiator, SOCKET_STATE, start_message_processor};
 
 
 #[derive(Clone, Copy)]
@@ -251,11 +251,14 @@ async fn main() -> ExitCode {
         .with_writer(non_blocking_stdout)
         .init();
 
+    // launch the reader
+    let mut socket_state = start_message_processor();
+
     // attempt initial connection to Radiator
-    let radiator_socket = connect_to_radiator(&config.radiator).await
+    connect_to_radiator(&config.radiator, &mut socket_state).await
         .expect("failed to connect to Radiator management port");
-    RADIATOR_SOCKET
-        .set(Mutex::new(radiator_socket)).expect("RADIATOR_SOCKET already set?!");
+    SOCKET_STATE
+        .set(Mutex::new(socket_state)).expect("SOCKET_STATE already set?!");
 
     // listen for HTTP
     let bind_addr = SocketAddr::from((config.www.bind_address, config.www.port));
