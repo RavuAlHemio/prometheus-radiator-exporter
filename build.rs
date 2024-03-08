@@ -20,6 +20,9 @@ fn stamp_version() {
         .stdout;
     let revision_string = String::from_utf8(revision_output)
         .expect("git revision is not valid UTF-8?!");
+    if revision_string.trim().is_empty() {
+        panic!("trimmed git revision string is empty");
+    }
 
     let source_file_contents = std::fs::read_to_string(SOURCE_FILE_PATH)
         .expect("failed to read source file");
