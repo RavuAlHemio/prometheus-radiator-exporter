@@ -98,10 +98,17 @@ pub(crate) async fn communicate(command: &[u8]) -> Result<Vec<u8>, Error> {
         write_command(&mut *connection_guard, command).await?;
     }
 
-    // try receiving a response
     let mut buf = Vec::new();
-    connection_guard.read_until(b'\0', &mut buf).await?;
-    assert_eq!(buf.last(), Some(&b'\0'));
-    buf.pop();
+    loop {
+        // try receiving a response
+        connection_guard.read_until(b'\0', &mut buf).await?;
+        assert_eq!(buf.last(), Some(&b'\0'));
+        buf.pop();
+
+        // get the next response if we receive a log message
+        if !buf.starts_with(b"LOG ") {
+            break;
+        }
+    }
     Ok(buf)
 }
