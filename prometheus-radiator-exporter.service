@@ -1,0 +1,42 @@
+# systemd service unit file for prometheus-radiator-exporter
+
+[Unit]
+Description=Radiator exporter for Prometheus
+
+[Service]
+ExecStart=/opt/prometheus-radiator-exporter/prometheus-radiator-exporter
+WorkingDirectory=/opt/prometheus-radiator-exporter
+
+# a bit of hardening
+PrivateNetwork=no
+DynamicUser=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+IPAddressDeny=
+DevicePolicy=closed
+PrivateDevices=no
+PrivateUsers=yes
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectKernelTunables=yes
+ProtectProc=invisible
+SystemCallArchitectures=native
+SystemCallFilter=@basic-io
+SystemCallFilter=@file-system
+SystemCallFilter=@io-event
+SystemCallFilter=@network-io
+SystemCallFilter=@signal
+SystemCallErrorNumber=EPERM
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+ProtectHostname=yes
+ProcSubset=pid
+
+[Install]
+WantedBy=multi-user.target
