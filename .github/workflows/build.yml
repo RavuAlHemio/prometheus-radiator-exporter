@@ -21,6 +21,8 @@ jobs:
         run: "curl --proto '=https' -sSf https://sh.rustup.rs | sh -s -- -y"
       - name: check out repository code
         uses: actions/checkout@v4
+      - name: trust the repository directory
+        run: 'git config --global --add safe.directory `pwd`'
       - name: run debug build
         run: '. $HOME/.cargo/env && cargo build --all-targets'
       - name: run debug tests
@@ -51,6 +53,8 @@ jobs:
         run: "curl --proto '=https' -sSf https://sh.rustup.rs | sh -s -- -y"
       - name: check out repository code
         uses: actions/checkout@v4
+      - name: trust the repository directory
+        run: 'git config --global --add safe.directory `pwd`'
       - name: run release build
         run: '. $HOME/.cargo/env && cargo build --all-targets --release'
       - name: run release tests
