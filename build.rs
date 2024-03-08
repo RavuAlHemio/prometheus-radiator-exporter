@@ -12,7 +12,7 @@ fn stamp_version() {
         .arg("HEAD")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .spawn()
         .expect("failed to ask git for current revision");
     let revision_output = running_git.wait_with_output()
