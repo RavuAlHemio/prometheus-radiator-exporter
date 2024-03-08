@@ -9,6 +9,7 @@ jobs:
       LC_ALL: C.UTF-8
       DEBIAN_FRONTEND: noninteractive
       TZ: Etc/UTC
+      PROM_RAD_EXP_CICD: 1
     steps:
       - name: update apt database
         run: apt-get -y update
@@ -38,6 +39,7 @@ jobs:
       LC_ALL: C.UTF-8
       DEBIAN_FRONTEND: noninteractive
       TZ: Etc/UTC
+      PROM_RAD_EXP_CICD: 1
     steps:
       - name: update apt database
         run: apt-get -y update

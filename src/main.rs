@@ -26,6 +26,9 @@ use crate::config::{CONFIG, Config};
 use crate::radiator::{connect_to_radiator, SOCKET_STATE, start_message_processor};
 
 
+const GIT_REVISION: &str = "<unknown git revision>";
+
+
 #[derive(Clone, Copy)]
 enum Number {
     Integer(i64),
@@ -223,6 +226,7 @@ async fn main() -> ExitCode {
             .map(|s| s.to_string_lossy().starts_with("-"))
             .unwrap_or(false);
     if output_usage {
+        eprintln!("prometheus-radiator-exporter {} {}", env!("CARGO_PKG_VERSION"), GIT_REVISION);
         eprintln!("Usage: {} [CONFIG.TOML]", prog_name);
         return ExitCode::FAILURE;
     }
