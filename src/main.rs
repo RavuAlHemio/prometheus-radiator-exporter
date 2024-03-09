@@ -20,7 +20,7 @@ use hyper_util::server::conn::auto::Builder;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use toml;
-use tracing::{error, warn};
+use tracing::{error, instrument, warn};
 
 use crate::config::{CONFIG, Config};
 use crate::radiator::{connect_to_radiator, SOCKET_STATE, start_message_processor};
@@ -69,7 +69,8 @@ fn escape_openmetrics_into(source: &str, destination: &mut String) {
 }
 
 
-async fn handle_request(request: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
+#[instrument(skip(request))]
+async fn handle_request(request: Request<Incoming>, remote_addr: SocketAddr) -> Result<Response<Full<Bytes>>, Infallible> {
     if request.method() != Method::GET {
         let response_res = Response::builder()
             .status(405)
@@ -276,7 +277,9 @@ async fn main() -> ExitCode {
             let connection_result = Builder::new(TokioExecutor::new())
                 .http1()
                 .http2()
-                .serve_connection(io, service_fn(handle_request))
+                .serve_connection(io, service_fn(move |req| async move {
+                    handle_request(req, remote_addr).await
+                }))
                 .await;
             if let Err(e) = connection_result {
                 error!("server error while handling connection from {}: {}", remote_addr, e);
