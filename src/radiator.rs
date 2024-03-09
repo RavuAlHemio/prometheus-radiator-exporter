@@ -1,6 +1,7 @@
 use std::fmt;
 use std::io;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
@@ -13,6 +14,7 @@ use crate::config::{CONFIG, RadiatorConfig};
 
 
 pub(crate) static SOCKET_STATE: OnceLock<Mutex<SocketState>> = OnceLock::new();
+static SOCKET_GONE: AtomicBool = AtomicBool::new(false);
 
 
 #[derive(Debug)]
@@ -40,6 +42,7 @@ async fn message_processor(
                 error!("error reading from Radiator management socket: {}", e);
 
                 // break out, waiting for a new socket
+                SOCKET_GONE.store(true, Ordering::SeqCst);
                 break;
             }
             if buf.len() == 0 {
@@ -47,6 +50,7 @@ async fn message_processor(
                 warn!("end-of-file encountered while reading from Radiator management socket");
 
                 // again, wait for a new socket
+                SOCKET_GONE.store(true, Ordering::SeqCst);
                 break;
             }
             assert!(buf.last() == Some(&b'\0'));
@@ -166,6 +170,8 @@ pub(crate) async fn communicate(command: &[u8]) -> Result<Vec<u8>, Error> {
 
     // try sending
     if let Err(_) = write_command(writer, command).await {
+        warn!("initial writing attempt failed; reconnecting");
+
         // that failed; try making a new connection
         let config_guard = CONFIG
             .get().expect("CONFIG not set?!");
@@ -177,6 +183,11 @@ pub(crate) async fn communicate(command: &[u8]) -> Result<Vec<u8>, Error> {
         let new_writer = state_guard.socket_writer
             .as_mut().expect("SOCKET_STATE.socket_writer not set?!");
         write_command(new_writer, command).await?;
+    }
+
+    if SOCKET_GONE.swap(false, Ordering::SeqCst) {
+        // the socket has been torn down in the meantime
+        return Err(Error::ReaderGone);
     }
 
     // receive a response

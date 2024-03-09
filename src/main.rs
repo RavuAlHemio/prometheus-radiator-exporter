@@ -23,7 +23,7 @@ use toml;
 use tracing::{error, instrument, warn};
 
 use crate::config::{CONFIG, Config};
-use crate::radiator::{connect_to_radiator, SOCKET_STATE, start_message_processor};
+use crate::radiator::{connect_to_radiator, Error, SOCKET_STATE, start_message_processor};
 
 
 const GIT_REVISION: &str = "<unknown git revision>";
@@ -87,12 +87,15 @@ async fn handle_request(request: Request<Incoming>, remote_addr: SocketAddr) -> 
     }
 
     // ask Radiator for top-level statistics
-    let radiator_response = match crate::radiator::communicate(b"STATS .").await {
-        Ok(rr) => rr,
-        Err(e) => {
-            error!("failed to query Radiator: {}", e);
-            return return_500();
-        },
+    let radiator_response = loop {
+        match crate::radiator::communicate(b"STATS .").await {
+            Ok(rr) => break rr,
+            Err(Error::ReaderGone) => continue,
+            Err(e) => {
+                error!("failed to query Radiator: {}", e);
+                return return_500();
+            },
+        }
     };
 
     // response format: b"STATS .\nkey1:value1\x01key2:value2\x01key3:value3"
