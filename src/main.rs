@@ -1,4 +1,5 @@
 mod config;
+mod openmetrics;
 mod radiator;
 
 
@@ -6,7 +7,6 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::ffi::OsString;
-use std::fmt::{self, Write};
 use std::net::SocketAddr;
 use std::path::Path;
 use std::process::ExitCode;
@@ -23,24 +23,17 @@ use toml;
 use tracing::{error, instrument, warn};
 
 use crate::config::{CONFIG, Config};
-use crate::radiator::{connect_to_radiator, Error, SOCKET_STATE, start_message_processor};
+use crate::openmetrics::{MetricDatabase, Number};
+use crate::radiator::{connect_to_radiator, SOCKET_STATE, start_message_processor};
 
 
 const GIT_REVISION: &str = "<unknown git revision>";
 
 
-#[derive(Clone, Copy)]
-enum Number {
-    Integer(i64),
-    Float(f64),
-}
-impl fmt::Display for Number {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Integer(v) => write!(f, "{}", v),
-            Self::Float(v) => write!(f, "{}", v),
-        }
-    }
+#[derive(Clone, Debug)]
+struct PerObjectStats {
+    pub identifier: String,
+    pub stats: HashMap<String, Number>,
 }
 
 
@@ -55,67 +48,25 @@ fn return_500() -> Result<Response<Full<Bytes>>, Infallible> {
 }
 
 
-fn escape_openmetrics_into(source: &str, destination: &mut String) {
-    for c in source.chars() {
-        if c == '\\' || c == '"' {
-            destination.push('\\');
-            destination.push(c);
-        } else if c == '\n' {
-            destination.push_str("\\n");
-        } else {
-            destination.push(c);
-        }
-    }
-}
-
-
-#[instrument(skip(request))]
-async fn handle_request(request: Request<Incoming>, remote_addr: SocketAddr) -> Result<Response<Full<Bytes>>, Infallible> {
-    if request.method() != Method::GET {
-        let response_res = Response::builder()
-            .status(405)
-            .header("Content-Type", "text/plain; charset=utf-8")
-            .header("Allow", "GET")
-            .body(Full::new(Bytes::from("HTTP method must be GET")));
-        return match response_res {
-            Ok(r) => Ok(r),
-            Err(e) => {
-                error!("failed to construct 405 response: {}", e);
-                return_500()
-            },
-        };
-    }
-
-    // ask Radiator for top-level statistics
-    let radiator_response = loop {
-        match crate::radiator::communicate(b"STATS .").await {
-            Ok(rr) => break rr,
-            Err(Error::ReaderGone) => continue,
-            Err(e) => {
-                error!("failed to query Radiator: {}", e);
-                return return_500();
-            },
-        }
-    };
-
+fn decode_stats(response: &[u8]) -> Option<HashMap<String, Number>> {
     // response format: b"STATS .\nkey1:value1\x01key2:value2\x01key3:value3"
 
     // skip echoed command
-    let newline_index = match radiator_response.iter().position(|b| *b == b'\n') {
+    let newline_index = match response.iter().position(|b| *b == b'\n') {
         Some(i) => i,
         None => {
-            error!("Radiator response {:?} does not contain a newline (splitting echoed command and actual response)", radiator_response);
-            return return_500();
+            error!("Radiator response {:?} does not contain a newline (splitting echoed command and actual response)", response);
+            return None;
         },
     };
-    let unechoed_response = &radiator_response[newline_index+1..];
+    let unechoed_response = &response[newline_index+1..];
 
     // decode as UTF-8
     let response_string = match std::str::from_utf8(unechoed_response) {
         Ok(rs) => rs,
         Err(e) => {
-            error!("Radiator response {:?} is not valid UTF-8: {}", radiator_response, e);
-            return return_500();
+            error!("Radiator response {:?} is not valid UTF-8: {}", response, e);
+            return None;
         },
     };
 
@@ -152,58 +103,217 @@ async fn handle_request(request: Request<Incoming>, remote_addr: SocketAddr) -> 
         }
     }
 
-    // prepare OpenMetrics output
-    let mut output = String::new();
+    Some(statistics)
+}
+
+
+fn extract_identifier(response: &[u8]) -> Option<String> {
+    // response format: b"DESCRIBE ObjectType.2\nkey1:type1:value1\x01key2:type2:value2\x01key3:type3:value3"
+
+    // skip echoed command
+    let newline_index = match response.iter().position(|b| *b == b'\n') {
+        Some(i) => i,
+        None => {
+            error!("Radiator response {:?} does not contain a newline (splitting echoed command and actual response)", response);
+            return None;
+        },
+    };
+    let unechoed_response = &response[newline_index+1..];
+
+    // decode as UTF-8
+    let response_string = match std::str::from_utf8(unechoed_response) {
+        Ok(rs) => rs,
+        Err(e) => {
+            error!("Radiator response {:?} is not valid UTF-8: {}", response, e);
+            return None;
+        },
+    };
+
+    // key-type-value tuples are delimited by U+0001 characters
+    let key_type_value_tuples = response_string.split('\u{0001}');
+    for key_type_value_tuple in key_type_value_tuples {
+        // keys, types and values are delimited by colons (the first two)
+        let (key, type_value_pair) = match key_type_value_tuple.split_once(':') {
+            Some(ktvp) => ktvp,
+            None => {
+                warn!("statistics key-type-value tuple {:?} does not contain colon; skipping", key_type_value_tuple);
+                continue;
+            },
+        };
+        let (value_type, value) = match type_value_pair.split_once(':') {
+            Some(tv) => tv,
+            None => {
+                warn!("statistics key-type-value tuple {:?} does not contain second colon; skipping", key_type_value_tuple);
+                continue;
+            },
+        };
+
+        if key == "Identifier" && value_type == "string" {
+            return Some(value.to_owned());
+        }
+    }
+
+    None
+}
+
+
+#[instrument(skip(request))]
+async fn handle_request(request: Request<Incoming>, remote_addr: SocketAddr) -> Result<Response<Full<Bytes>>, Infallible> {
+    if request.method() != Method::GET {
+        let response_res = Response::builder()
+            .status(405)
+            .header("Content-Type", "text/plain; charset=utf-8")
+            .header("Allow", "GET")
+            .body(Full::new(Bytes::from("HTTP method must be GET")));
+        return match response_res {
+            Ok(r) => Ok(r),
+            Err(e) => {
+                error!("failed to construct 405 response: {}", e);
+                return_500()
+            },
+        };
+    }
+
+    let mut metric_database = MetricDatabase::new();
+
+    // ask Radiator for top-level statistics
+    let radiator_response = match crate::radiator::communicate(b"STATS .").await {
+        Ok(rr) => rr,
+        Err(e) => {
+            error!("failed to query Radiator global stats: {}", e);
+            return return_500();
+        },
+    };
+    let statistics = match decode_stats(&radiator_response) {
+        Some(s) => s,
+        None => {
+            // error already output
+            return return_500();
+        },
+    };
+
     let config = CONFIG
         .get().expect("CONFIG not set?!");
-    for metric in &config.metrics {
-        let mut first_sample = true;
 
-        for sample in &metric.samples {
-            // do we even have a value for this one?
-            let Some(value) = statistics.get(&sample.statistic) else { continue };
-
-            if first_sample {
-                write!(output, "# TYPE {} {}\n", metric.metric, metric.kind.as_openmetrics()).unwrap();
-
-                if let Some(unit) = metric.unit.as_ref() {
-                    write!(output, "# UNIT {} {}\n", metric.metric, unit).unwrap();
-                }
-
-                if let Some(help) = metric.help.as_ref() {
-                    write!(output, "# HELP {} ", metric.metric).unwrap();
-                    escape_openmetrics_into(help, &mut output);
-                    output.push('\n');
-                }
-
-                first_sample = false;
+    // run through per-object statistics
+    let mut object_type_to_statistics: HashMap<String, HashMap<usize, PerObjectStats>> = HashMap::new();
+    for per_object_statistic in &config.per_object_metrics {
+        // query the identifiers
+        let mut index_to_identifier: HashMap<usize, String> = HashMap::new();
+        for i in 0.. {
+            let command = format!("DESCRIBE {}.{}", per_object_statistic.kind, i);
+            let radiator_response = match crate::radiator::communicate(command.as_bytes()).await {
+                Ok(rr) => rr,
+                Err(e) => {
+                    error!("failed to query Radiator info for {}.{}: {}", per_object_statistic.kind, i, e);
+                    return return_500();
+                },
+            };
+            if radiator_response == b"NOSUCHOBJECT" {
+                // that is all
+                break;
             }
-
-            write!(output, "{}{}", metric.metric, metric.kind.openmetrics_metric_suffix()).unwrap();
-            if sample.labels.len() > 0 {
-                output.push('{');
-                let mut first_label = true;
-                for (label_key, label_value) in &sample.labels {
-                    if first_label {
-                        first_label = false;
-                    } else {
-                        output.push(',');
-                    }
-                    write!(output, "{}=\"", label_key).unwrap();
-                    escape_openmetrics_into(label_value, &mut output);
-                    output.push('"');
-                }
-                output.push('}');
-            }
-
-            write!(output, " {}\n", value).unwrap();
+            let identifier = match extract_identifier(&radiator_response) {
+                Some(id) => id,
+                None => {
+                    warn!("Radiator object {}.{} does not have an identifier; skipping", per_object_statistic.kind, i);
+                    continue;
+                },
+            };
+            index_to_identifier.insert(i, identifier);
         }
+
+        // pull statistics for each object
+        let mut index_to_statistics = HashMap::new();
+        for (&index, identifier) in &index_to_identifier {
+            let command = format!("STATS {}.{}", per_object_statistic.kind, index);
+            let radiator_response = match crate::radiator::communicate(command.as_bytes()).await {
+                Ok(rr) => rr,
+                Err(e) => {
+                    error!("failed to query Radiator stats for {}.{}: {}", per_object_statistic.kind, index, e);
+                    return return_500();
+                },
+            };
+            let stats = match decode_stats(&radiator_response) {
+                Some(s) => s,
+                None => {
+                    // error already output
+                    return return_500();
+                },
+            };
+            let per_object_stats = PerObjectStats {
+                identifier: identifier.clone(),
+                stats,
+            };
+            index_to_statistics.insert(index, per_object_stats);
+        }
+
+        object_type_to_statistics.insert(per_object_statistic.kind.clone(), index_to_statistics);
+    }
+
+    // populate metrics database
+    for metric_config in &config.metrics {
+        let metric = metric_database.get_or_insert(&metric_config.metric, metric_config.kind);
+        metric.set_unit(metric_config.unit.clone());
+        metric.set_help(metric_config.help.clone());
+        for sample in &metric_config.samples {
+            for label_name in sample.labels.keys() {
+                if !metric.has_label(label_name) {
+                    metric.add_label(label_name.to_owned());
+                }
+            }
+        }
+
+        for sample in &metric_config.samples {
+            let value = match statistics.get(&sample.statistic) {
+                Some(v) => v,
+                None => continue,
+            };
+            metric.add_sample(&sample.labels, value.clone());
+        }
+    }
+    for per_object_metrics in &config.per_object_metrics {
+        let Some(index_to_statistics) = object_type_to_statistics.get(&per_object_metrics.kind)
+            else { continue };
+        for metric_config in &per_object_metrics.metrics {
+            let metric = metric_database.get_or_insert(&metric_config.metric, metric_config.kind);
+            metric.set_unit(metric_config.unit.clone());
+            metric.set_help(metric_config.help.clone());
+            for sample in &metric_config.samples {
+                for label_name in sample.labels.keys() {
+                    if !metric.has_label(label_name) {
+                        metric.add_label(label_name.to_owned());
+                    }
+                }
+            }
+            metric.add_label(per_object_metrics.identifier_label.clone());
+
+            for per_object_statistics in index_to_statistics.values() {
+                for sample in &metric_config.samples {
+                    let mut all_labels = sample.labels.clone();
+                    all_labels.insert(per_object_metrics.identifier_label.clone(), per_object_statistics.identifier.clone());
+                    let value = match per_object_statistics.stats.get(&sample.statistic) {
+                        Some(v) => v,
+                        None => continue,
+                    };
+                    metric.add_sample(&all_labels, value.clone());
+                }
+            }
+        }
+    }
+
+    // collect the output
+    let mut output = String::new();
+    if let Err(e) = metric_database.write(&mut output) {
+        error!("error collecting metrics output: {}", e);
+        return return_500();
     }
     output.push_str("# EOF\n");
 
     let response_res = Response::builder()
         .status(200)
-        .header("Content-Type", "application/openmetrics-text; version=1.0.0; charset=utf-8")
+        .header("Content-Type", crate::openmetrics::MIME_TYPE)
+        .header("Content-Length", &output.len().to_string())
         .body(Full::new(Bytes::from(output)));
     match response_res {
         Ok(r) => Ok(r),

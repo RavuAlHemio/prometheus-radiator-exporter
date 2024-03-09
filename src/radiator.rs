@@ -161,7 +161,7 @@ async fn write_command(writer: &mut OwnedWriteHalf, command: &[u8]) -> Result<()
     Ok(())
 }
 
-pub(crate) async fn communicate(command: &[u8]) -> Result<Vec<u8>, Error> {
+async fn communicate_inner(command: &[u8]) -> Result<Vec<u8>, Error> {
     let mut state_guard = SOCKET_STATE
         .get().expect("SOCKET_STATE not set?!")
         .lock().await;
@@ -194,4 +194,16 @@ pub(crate) async fn communicate(command: &[u8]) -> Result<Vec<u8>, Error> {
     state_guard.message_receiver
         .recv().await
         .ok_or(Error::ReaderGone)
+}
+
+pub(crate) async fn communicate(command: &[u8]) -> Result<Vec<u8>, Error> {
+    for _ in 0..3 {
+        match communicate_inner(command).await {
+            Ok(rr) => return Ok(rr),
+            Err(Error::ReaderGone) => continue,
+            Err(e) => return Err(e),
+        }
+    }
+
+    Err(Error::ReaderGone)
 }

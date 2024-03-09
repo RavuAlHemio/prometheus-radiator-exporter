@@ -8,6 +8,8 @@ mgmt_port = 9000
 username = "prom"
 password = "Tr0ub4dor&3"
 
+## totals
+
 [[metrics]]
 metric = "radiator_requests"
 kind = "counter"
@@ -87,5 +89,269 @@ kind = "gauge"
 unit = "seconds"
 help = "Average response time over the past 100 requests."
 [[metrics.samples]]
+labels = {}
+statistic = "Average response time"
+
+## per <Handler>
+
+[[per_object_metrics]]
+kind = "Handler"
+identifier_label = "handler"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_handler_requests"
+kind = "counter"
+help = "Number of requests received, categorized by handler and request type."
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access" }
+statistic = "Access requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting" }
+statistic = "Accounting requests"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_handler_responses"
+kind = "counter"
+help = "Number of responses to requests sent, categorized by handler and response type."
+[[per_object_metrics.metrics.samples]]
+labels = { response_type = "access_accept" }
+statistic = "Access accepts"
+[[per_object_metrics.metrics.samples]]
+labels = { response_type = "access_challenge" }
+statistic = "Access challenges"
+[[per_object_metrics.metrics.samples]]
+labels = { response_type = "access_reject" }
+statistic = "Access rejects"
+[[per_object_metrics.metrics.samples]]
+labels = { response_type = "accounting" }
+statistic = "Accounting responses"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_handler_request_errors"
+kind = "counter"
+help = "Number of request errors, categorized by request and error type."
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access", error_type = "bad_authenticator" }
+statistic = "Bad authenticators in authentication requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access", error_type = "dropped" }
+statistic = "Dropped access requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access", error_type = "duplicate" }
+statistic = "Duplicate access requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access", error_type = "malformed" }
+statistic = "Malformed access requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting", error_type = "bad_authenticator" }
+statistic = "Bad authenticators in accounting requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting", error_type = "dropped" }
+statistic = "Dropped accounting requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting", error_type = "duplicate" }
+statistic = "Duplicate accounting requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting", error_type = "malformed" }
+statistic = "Malformed accounting requests"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_handler_proxied_requests"
+kind = "counter"
+help = "Number of requests proxied to a remote RADIUS server."
+[[per_object_metrics.metrics.samples]]
+labels = {}
+statistic = "Total proxied requests"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_handler_proxied_requests_with_no_reply"
+kind = "counter"
+help = "Number of proxied requests that did not receive a reply from the remote RADIUS server."
+[[per_object_metrics.metrics.samples]]
+labels = {}
+statistic = "Total proxied requests with no reply"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_handler_average_response_time_seconds"
+kind = "gauge"
+unit = "seconds"
+help = "Average response time over the past 100 requests."
+[[per_object_metrics.metrics.samples]]
+labels = {}
+statistic = "Average response time"
+
+## per <Client>
+
+[[per_object_metrics]]
+kind = "Client"
+identifier_label = "client"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_client_requests"
+kind = "counter"
+help = "Number of requests received, categorized by handler and request type."
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access" }
+statistic = "Access requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting" }
+statistic = "Accounting requests"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_client_responses"
+kind = "counter"
+help = "Number of responses to requests sent, categorized by handler and response type."
+[[per_object_metrics.metrics.samples]]
+labels = { response_type = "access_accept" }
+statistic = "Access accepts"
+[[per_object_metrics.metrics.samples]]
+labels = { response_type = "access_challenge" }
+statistic = "Access challenges"
+[[per_object_metrics.metrics.samples]]
+labels = { response_type = "access_reject" }
+statistic = "Access rejects"
+[[per_object_metrics.metrics.samples]]
+labels = { response_type = "accounting" }
+statistic = "Accounting responses"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_client_request_errors"
+kind = "counter"
+help = "Number of request errors, categorized by request and error type."
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access", error_type = "bad_authenticator" }
+statistic = "Bad authenticators in authentication requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access", error_type = "dropped" }
+statistic = "Dropped access requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access", error_type = "duplicate" }
+statistic = "Duplicate access requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access", error_type = "malformed" }
+statistic = "Malformed access requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting", error_type = "bad_authenticator" }
+statistic = "Bad authenticators in accounting requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting", error_type = "dropped" }
+statistic = "Dropped accounting requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting", error_type = "duplicate" }
+statistic = "Duplicate accounting requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting", error_type = "malformed" }
+statistic = "Malformed accounting requests"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_client_proxied_requests"
+kind = "counter"
+help = "Number of requests proxied to a remote RADIUS server."
+[[per_object_metrics.metrics.samples]]
+labels = {}
+statistic = "Total proxied requests"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_client_proxied_requests_with_no_reply"
+kind = "counter"
+help = "Number of proxied requests that did not receive a reply from the remote RADIUS server."
+[[per_object_metrics.metrics.samples]]
+labels = {}
+statistic = "Total proxied requests with no reply"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_client_average_response_time_seconds"
+kind = "gauge"
+unit = "seconds"
+help = "Average response time over the past 100 requests."
+[[per_object_metrics.metrics.samples]]
+labels = {}
+statistic = "Average response time"
+
+## per <AuthBy>
+
+[[per_object_metrics]]
+kind = "AuthBy"
+identifier_label = "authby"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_authby_requests"
+kind = "counter"
+help = "Number of requests received, categorized by handler and request type."
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access" }
+statistic = "Access requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting" }
+statistic = "Accounting requests"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_authby_responses"
+kind = "counter"
+help = "Number of responses to requests sent, categorized by handler and response type."
+[[per_object_metrics.metrics.samples]]
+labels = { response_type = "access_accept" }
+statistic = "Access accepts"
+[[per_object_metrics.metrics.samples]]
+labels = { response_type = "access_challenge" }
+statistic = "Access challenges"
+[[per_object_metrics.metrics.samples]]
+labels = { response_type = "access_reject" }
+statistic = "Access rejects"
+[[per_object_metrics.metrics.samples]]
+labels = { response_type = "accounting" }
+statistic = "Accounting responses"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_authby_request_errors"
+kind = "counter"
+help = "Number of request errors, categorized by request and error type."
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access", error_type = "bad_authenticator" }
+statistic = "Bad authenticators in authentication requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access", error_type = "dropped" }
+statistic = "Dropped access requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access", error_type = "duplicate" }
+statistic = "Duplicate access requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "access", error_type = "malformed" }
+statistic = "Malformed access requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting", error_type = "bad_authenticator" }
+statistic = "Bad authenticators in accounting requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting", error_type = "dropped" }
+statistic = "Dropped accounting requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting", error_type = "duplicate" }
+statistic = "Duplicate accounting requests"
+[[per_object_metrics.metrics.samples]]
+labels = { request_type = "accounting", error_type = "malformed" }
+statistic = "Malformed accounting requests"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_authby_proxied_requests"
+kind = "counter"
+help = "Number of requests proxied to a remote RADIUS server."
+[[per_object_metrics.metrics.samples]]
+labels = {}
+statistic = "Total proxied requests"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_authby_proxied_requests_with_no_reply"
+kind = "counter"
+help = "Number of proxied requests that did not receive a reply from the remote RADIUS server."
+[[per_object_metrics.metrics.samples]]
+labels = {}
+statistic = "Total proxied requests with no reply"
+
+[[per_object_metrics.metrics]]
+metric = "radiator_authby_average_response_time_seconds"
+kind = "gauge"
+unit = "seconds"
+help = "Average response time over the past 100 requests."
+[[per_object_metrics.metrics.samples]]
 labels = {}
 statistic = "Average response time"
