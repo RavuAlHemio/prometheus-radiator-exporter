@@ -35,3 +35,4 @@ ProcSubset=pid
 
 [Install]
 WantedBy=multi-user.target
+After=radiator.service
