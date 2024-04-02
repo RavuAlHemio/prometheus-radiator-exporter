@@ -2,6 +2,7 @@
 
 [Unit]
 Description=Radiator exporter for Prometheus
+After=radiator.service
 
 [Service]
 ExecStart=/opt/prometheus-radiator-exporter/prometheus-radiator-exporter
@@ -35,4 +36,3 @@ ProcSubset=pid
 
 [Install]
 WantedBy=multi-user.target
-After=radiator.service
