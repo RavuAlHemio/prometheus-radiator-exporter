@@ -22,6 +22,9 @@ use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use toml;
 use tracing::{error, instrument, warn};
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 use crate::config::{CONFIG, Config};
 use crate::openmetrics::{MetricDatabase, Number};
@@ -366,8 +369,12 @@ async fn main() -> ExitCode {
 
     // enable tracing
     let (non_blocking_stdout, _guard) = tracing_appender::non_blocking(std::io::stdout());
-    tracing_subscriber::fmt()
-        .with_writer(non_blocking_stdout)
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env())
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(non_blocking_stdout)
+        )
         .init();
 
     // launch the reader
