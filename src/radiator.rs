@@ -11,6 +11,7 @@ use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tracing::{error, warn};
 
 use crate::config::{CONFIG, RadiatorConfig};
+use crate::util::HexDumper;
 
 
 pub(crate) static SOCKET_STATE: OnceLock<Mutex<SocketState>> = OnceLock::new();
@@ -53,6 +54,7 @@ async fn message_processor(
                 SOCKET_GONE.store(true, Ordering::SeqCst);
                 break;
             }
+            debug!("received message: {}", HexDumper(buf.as_slice()));
             assert!(buf.last() == Some(&b'\0'));
             buf.pop();
 
@@ -131,6 +133,7 @@ pub(crate) async fn connect_to_radiator(config: &RadiatorConfig, state: &mut Soc
     // read login response
     let mut buf = Vec::new();
     buffered_reader.read_until(b'\0', &mut buf).await?;
+    debug!("obtained login response: {}", HexDumper(buf.as_slice()));
     if buf == b"LOGGEDIN\0" {
         // store writing socket
         state.socket_writer = Some(write_half);
@@ -155,6 +158,7 @@ async fn write_command(writer: &mut OwnedWriteHalf, command: &[u8]) -> Result<()
     terminated_command.extend_from_slice(command);
     terminated_command.push(b'\0');
 
+    debug!("sending command: {}", HexDumper(terminated_command.as_slice()));
     writer.write_all(&terminated_command).await?;
     writer.flush().await?;
 

@@ -1,6 +1,7 @@
 mod config;
 mod openmetrics;
 mod radiator;
+mod util;
 
 
 use std::borrow::Cow;
