@@ -238,6 +238,10 @@ async fn handle_request(request: Request<Incoming>, remote_addr: SocketAddr) -> 
                     return return_500();
                 },
             };
+            if radiator_response == b"NOSUCHOBJECT" {
+                // I guess this object has disappeared in the meantime
+                continue;
+            }
             let stats = match decode_stats(&radiator_response) {
                 Some(s) => s,
                 None => {
